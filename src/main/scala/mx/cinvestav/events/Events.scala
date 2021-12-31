@@ -3,7 +3,8 @@ package mx.cinvestav.events
 import cats.implicits._
 import cats.effect.IO
 import mx.cinvestav.Declarations.NodeContext
-import mx.cinvestav.commons.events.{EventX,Get,Put}
+import mx.cinvestav.commons.events.ServiceReplicator.StartedService
+import mx.cinvestav.commons.events.{EventX, Get, Put}
 
 import java.util.UUID
 

@@ -1,15 +1,21 @@
 package mx.cinvestav
 
 import cats.effect.{ExitCode, IO, IOApp}
+//
 import mx.cinvestav.Declarations.{NodeContext, NodeState}
 import mx.cinvestav.config.DefaultConfig
 import mx.cinvestav.server.HttpServer
+//
 import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.client.Client
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.log4cats.{Logger, SelfAwareStructuredLogger}
+//
 import pureconfig._
 import pureconfig.generic.auto._
+//
+import scala.concurrent.duration._
+import language.postfixOps
 
 import scala.concurrent.ExecutionContext.global
 object Main extends IOApp {
@@ -28,6 +34,7 @@ object Main extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =for {
     (client,finalizer) <- BlazeClientBuilder[IO](global).resource.allocated
     implicit0(ctx:NodeContext) <- initContext(client)
+    _ <- Daemon(period = ctx.config.delayMs milliseconds).compile.drain.start
     _ <- HttpServer().run()
     _ <- finalizer
   } yield ExitCode.Success

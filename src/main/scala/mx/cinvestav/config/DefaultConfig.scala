@@ -7,4 +7,5 @@ case class DefaultConfig(
                         host:String,
                         port:Int,
                         apiVersion:Int,
+                        delayMs:Long
                         )
