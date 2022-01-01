@@ -5,7 +5,8 @@ import cats.implicits._
 import cats.effect._
 import fs2.Stream
 import mx.cinvestav.Helpers
-import mx.cinvestav.commons.types.Monitoring.NodeInfo
+import mx.cinvestav.commons.types.Monitoring.{NodeInfo, PoolInfo}
+import org.typelevel.ci.CIString
 //
 import mx.cinvestav.Declarations.NodeContext
 import mx.cinvestav.Declarations.Implicits._
@@ -41,38 +42,38 @@ class HttpServer()(implicit ctx:NodeContext) {
         res          <- NoContent()
       } yield res
       case req@GET -> Root / "pool"/"info"  => for {
-
-        responses <- Helpers.getNodesInfos()
-//        currentState <- ctx.state.get
-//        events  = Events.orderAndFilterEventsMonotonic(events=currentState.events)
-//        addedServices = Events.onlyAddedService(events=events)
-//        uris = addedServices.map(_.asInstanceOf[AddedService]).map{x=>
-//          val hostname   = x.hostname
-//          val port       = x.port
-//          val apiVersion = ctx.config.apiVersion
-//          Uri.unsafeFromString(s"http://$hostname:$port/api/v$apiVersion/info")
-//        }
-//        requests = uris.map{ u=>Request[IO](
-//            method = Method.GET,
-//            uri    = u,
-//            headers = Headers.empty
-//          )}
-//        responses <- Stream.emits(requests).flatMap(r=>
-//          ctx.client.stream(r).evalMap{
-//            _.as[NodeInfo].handleErrorWith(e=>
-//              ctx.logger.error(e.getMessage) *> NodeInfo.empty.pure[IO]
+        currentState  <- ctx.state.get
+        headers       = req.headers
+        nodesKey      = CIString("Nodes")
+        maybeNodesIds      = headers.get(nodesKey)
+        events        = Events.orderAndFilterEventsMonotonic(events=currentState.events)
+        addedServices = Events.onlyAddedService(events=events).map(_.asInstanceOf[AddedService])
+        res             <- maybeNodesIds match {
+          case Some(nodeIds) => for {
+            _ <- IO.unit
+            _ <- ctx.logger.debug(s"NODE_IDS $nodeIds")
+            _ <- ctx.logger.debug((s"NODE_IDS2 ${addedServices.map(_.nodeId)}"))
+            _addedServices = addedServices.filter(x=>nodeIds.toList.contains(x.nodeId))
+            responses      <- Helpers.getNodesInfos(addedServices = _addedServices)
+            _              <- ctx.logger.debug("INFO_RESPONSES")
+            info           = Json.obj(
+              "poolId" -> ctx.config.poolId.asJson,
+              "infos" -> responses.asJson
+            )
+            res           <- Ok(info)
+          } yield res
+          case None => for {
+            responses     <- Helpers.getNodesInfos(addedServices = addedServices)
+            _             <- ctx.logger.debug("INFO_RESPONSES")
+            poolId = ctx.config.poolId
+            info          = PoolInfo(poolId = poolId,infos = responses)
+//              Json.obj(
+//              "poolId" -> ctx.config.poolId.asJson,
+//              "infos" -> responses.asJson
 //            )
-//          }
-//        ).compile.to(List).onError{ e=>
-//          ctx.logger.error(e.getMessage)
-//        }
-
-        _         <- ctx.logger.debug("INFO_RESPONSES")
-        info = Json.obj(
-          "poolId" -> ctx.config.poolId.asJson,
-          "infos" -> responses.asJson
-        )
-        res <- Ok(info)
+            res           <- Ok(info.asJson)
+          } yield res
+        }
       }  yield res
     }
   ).orNotFound
