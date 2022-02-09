@@ -7,6 +7,7 @@ import mx.cinvestav.Declarations.NodeContext
 import mx.cinvestav.commons.types.Monitoring.NodeInfo
 import mx.cinvestav.events.Events
 import mx.cinvestav.events.Events.AddedService
+import mx.cinvestav.commons.Implicits._
 //
 import org.http4s.{Headers, Method, Request, Uri}
 import org.http4s.circe.CirceEntityEncoder._
@@ -32,13 +33,16 @@ object Helpers {
         headers = Headers.empty
       )}
       responses <- Stream.emits(requests).flatMap(r=>
-        ctx.client.stream(r).evalMap{
-          _.as[NodeInfo].handleErrorWith(e=>
-            ctx.logger.error(e.getMessage) *> NodeInfo.empty.pure[IO]
-          )
+
+        Stream.eval(ctx.logger.debug(s"GET_INFO ${r.uri}"))*>ctx.client.stream(r).evalMap{
+          _.as[NodeInfo].handleErrorWith(e=> ctx.logger.error(e.getMessage) *> NodeInfo.empty.pure[IO])
+        }.handleErrorWith{ e=>
+          ctx.logger.error(e.getMessage).pureS *> Stream.emit(NodeInfo.empty)
         }
+
       ).compile.to(List).onError{ e=> ctx.logger.error(e.getMessage)}
-      } yield responses
+
+    } yield responses
     }
 
   }

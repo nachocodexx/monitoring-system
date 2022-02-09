@@ -23,10 +23,11 @@ object Daemon {
         events        = Events.orderAndFilterEventsMonotonic(events=currentState.events)
         addedServices = Events.onlyAddedService(events=events).map(_.asInstanceOf[AddedService])
         responses     <- Helpers.getNodesInfos(addedServices = addedServices)
-        _             <- if(responses.isEmpty)
-          IO.unit
-        else
-          ctx.logger.debug(s"INFOS ${responses.asJson.toString}")
+//        _
+//        _             <- if(responses.isEmpty)
+//          IO.unit
+//        else
+//          ctx.logger.debug(s"INFOS ${responses.asJson.toString}")
       } yield()
     }
   }

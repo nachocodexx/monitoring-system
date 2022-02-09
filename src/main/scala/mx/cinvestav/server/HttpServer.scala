@@ -33,6 +33,21 @@ class HttpServer()(implicit ctx:NodeContext) {
 
   def httpApp: Kleisli[IO, Request[IO], Response[IO]] = Router[IO](
     s"$apiBaseRouteName" -> HttpRoutes.of[IO]{
+      case req@GET -> Root / "stats" => for {
+        currentState  <- ctx.state.get
+        events        = Events.orderAndFilterEventsMonotonic(events=currentState.events)
+        addedServices = Events.onlyAddedService(events=events).map(_.asInstanceOf[AddedService])
+        infos         <- Helpers.getNodesInfos(addedServices = addedServices)
+        stats         = Json.obj(
+          "nodeId" -> ctx.config.nodeId.asJson,
+          "delayMs" -> ctx.config.delayMs.asJson,
+          "apiVersion" -> ctx.config.apiVersion.asJson,
+          "port"-> ctx.config.port.asJson,
+          "infos" -> infos.asJson
+        )
+        res   <- Ok(stats)
+      } yield res
+
       case req@POST -> Root / "nodes"/"add" => for {
         currentState <- ctx.state.get
         _            <- ctx.logger.debug("ADDED_NODE")
@@ -41,42 +56,37 @@ class HttpServer()(implicit ctx:NodeContext) {
         _            <- Events.saveEvents(events= addedService::Nil)
         res          <- NoContent()
       } yield res
+
       case req@GET -> Root / "pool"/"info"  => for {
         currentState  <- ctx.state.get
         headers       = req.headers
         nodesKey      = CIString("Nodes")
-        maybeNodesIds      = headers.get(nodesKey)
+        maybeNodesIds = headers.get(nodesKey)
         events        = Events.orderAndFilterEventsMonotonic(events=currentState.events)
         addedServices = Events.onlyAddedService(events=events).map(_.asInstanceOf[AddedService])
-        res             <- maybeNodesIds match {
+        poolId        = ctx.config.poolId
+        res           <- maybeNodesIds match {
           case Some(nodeIds) => for {
-            _ <- IO.unit
-            _ <- ctx.logger.debug(s"NODE_IDS $nodeIds")
-            _ <- ctx.logger.debug((s"NODE_IDS2 ${addedServices.map(_.nodeId)}"))
+            _              <- IO.unit
+            _              <- ctx.logger.debug(s"NODE_IDS $nodeIds")
+            _              <- ctx.logger.debug((s"NODE_IDS2 ${addedServices.map(_.nodeId)}"))
             _addedServices = addedServices.filter(x=>nodeIds.toList.contains(x.nodeId))
             responses      <- Helpers.getNodesInfos(addedServices = _addedServices)
             _              <- ctx.logger.debug("INFO_RESPONSES")
-            info           = Json.obj(
-              "poolId" -> ctx.config.poolId.asJson,
-              "infos" -> responses.asJson
-            )
-            res           <- Ok(info)
+            info           = PoolInfo(poolId = poolId,infos=responses)
+            res            <- Ok(info.asJson)
           } yield res
           case None => for {
-            responses     <- Helpers.getNodesInfos(addedServices = addedServices)
-            _             <- ctx.logger.debug("INFO_RESPONSES")
-            poolId = ctx.config.poolId
-            info          = PoolInfo(poolId = poolId,infos = responses)
-//              Json.obj(
-//              "poolId" -> ctx.config.poolId.asJson,
-//              "infos" -> responses.asJson
-//            )
-            res           <- Ok(info.asJson)
+            infos       <- Helpers.getNodesInfos(addedServices = addedServices)
+            _           <- ctx.logger.debug("INFO_RESPONSES")
+            info        = PoolInfo(poolId = poolId,infos = infos)
+            res         <- Ok(info.asJson)
           } yield res
         }
       }  yield res
     }
   ).orNotFound
+
   def run(): IO[Unit] =
     BlazeServerBuilder[IO](global)
       .bindHttp(ctx.config.port,ctx.config.host)
