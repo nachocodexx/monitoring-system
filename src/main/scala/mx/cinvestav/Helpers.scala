@@ -15,13 +15,14 @@ import org.http4s.circe.CirceEntityDecoder._
 //
 import io.circe._
 import io.circe.generic.auto._
+import mx.cinvestav.Declarations.Implicits.nodeInfoDecoder
 
 object Helpers {
 
   def getNodesInfos(addedServices:List[AddedService])(implicit ctx:NodeContext): IO[List[NodeInfo]] = {
     for {
       _              <- IO.unit
-      uris           = addedServices.map(_.asInstanceOf[AddedService]).map{x=>
+      uris           = addedServices.map{ x=>
         val hostname   = x.hostname
         val port       = x.port
         val apiVersion = ctx.config.apiVersion
@@ -34,8 +35,14 @@ object Helpers {
       )}
       responses <- Stream.emits(requests).flatMap(r=>
 
-        Stream.eval(ctx.logger.debug(s"GET_INFO ${r.uri}"))*>ctx.client.stream(r).evalMap{
-          _.as[NodeInfo].handleErrorWith(e=> ctx.logger.error(e.getMessage) *> NodeInfo.empty.pure[IO])
+        Stream.eval(ctx.logger.debug(s"GET_INFO_v2 ${r.uri}"))*>ctx.client.stream(r).evalMap{ x=>
+          for {
+            info <- x.as[NodeInfo]
+              .handleErrorWith(e=>
+                ctx.logger.error(e.getMessage) *> NodeInfo.empty.pure[IO]
+              )
+            _ <- ctx.logger.debug(info.toString)
+          } yield info
         }.handleErrorWith{ e=>
           ctx.logger.error(e.getMessage).pureS *> Stream.emit(NodeInfo.empty)
         }

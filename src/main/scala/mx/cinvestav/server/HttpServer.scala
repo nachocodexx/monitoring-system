@@ -26,6 +26,8 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 //
 import scala.concurrent.ExecutionContext.global
+import scala.concurrent.duration._
+import language.postfixOps
 
 class HttpServer()(implicit ctx:NodeContext) {
 
@@ -91,6 +93,9 @@ class HttpServer()(implicit ctx:NodeContext) {
     BlazeServerBuilder[IO](global)
       .bindHttp(ctx.config.port,ctx.config.host)
       .withHttpApp(httpApp = httpApp)
+      .withMaxConnections(100000)
+      .withBufferSize(ctx.config.bufferSize)
+      .withResponseHeaderTimeout(1 hour )
       .serve
       .compile
       .drain
