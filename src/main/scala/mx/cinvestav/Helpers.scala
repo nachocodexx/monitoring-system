@@ -21,8 +21,8 @@ object Helpers {
 
   def getNodesInfos(addedServices:List[AddedService])(implicit ctx:NodeContext): IO[List[NodeInfo]] = {
     for {
-      _              <- IO.unit
-      uris           = addedServices.map{ x=>
+      _                <- IO.unit
+      uris             = addedServices.map{ x=>
         val hostname   = x.hostname
         val port       = x.port
         val apiVersion = ctx.config.apiVersion

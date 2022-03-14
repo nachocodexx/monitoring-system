@@ -8,5 +8,6 @@ case class DefaultConfig(
                         port:Int,
                         apiVersion:Int,
                         delayMs:Long,
-                        bufferSize:Int
+                        bufferSize:Int,
+                        monitoringEnabled:Boolean
                         )

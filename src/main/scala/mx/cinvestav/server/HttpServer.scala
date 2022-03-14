@@ -36,6 +36,7 @@ class HttpServer()(implicit ctx:NodeContext) {
   def httpApp: Kleisli[IO, Request[IO], Response[IO]] = Router[IO](
     s"$apiBaseRouteName" -> HttpRoutes.of[IO]{
       case req@GET -> Root / "stats" => for {
+//      _________________________________________________
         currentState  <- ctx.state.get
         events        = Events.orderAndFilterEventsMonotonic(events=currentState.events)
         addedServices = Events.onlyAddedService(events=events).map(_.asInstanceOf[AddedService])
@@ -47,7 +48,8 @@ class HttpServer()(implicit ctx:NodeContext) {
           "port"-> ctx.config.port.asJson,
           "infos" -> infos.asJson
         )
-        res   <- Ok(stats)
+        res           <- Ok(stats)
+//      _________________________________________________
       } yield res
 
       case req@POST -> Root / "nodes"/"add" => for {
@@ -67,6 +69,7 @@ class HttpServer()(implicit ctx:NodeContext) {
         events        = Events.orderAndFilterEventsMonotonic(events=currentState.events)
         addedServices = Events.onlyAddedService(events=events).map(_.asInstanceOf[AddedService])
         poolId        = ctx.config.poolId
+//      _____________________________________________
         res           <- maybeNodesIds match {
           case Some(nodeIds) => for {
             _              <- IO.unit
@@ -85,6 +88,7 @@ class HttpServer()(implicit ctx:NodeContext) {
             res         <- Ok(info.asJson)
           } yield res
         }
+
       }  yield res
     }
   ).orNotFound

@@ -32,11 +32,11 @@ object Main extends IOApp {
 
 
   override def run(args: List[String]): IO[ExitCode] =for {
-    (client,finalizer) <- BlazeClientBuilder[IO](global).resource.allocated
+    (client,finalizer)         <- BlazeClientBuilder[IO](global).resource.allocated
     implicit0(ctx:NodeContext) <- initContext(client)
-    _ <- Daemon(period = ctx.config.delayMs milliseconds).compile.drain.start
-    _ <- HttpServer().run()
-    _ <- finalizer
+    _                          <- if(ctx.config.monitoringEnabled) Daemon(period = ctx.config.delayMs milliseconds).compile.drain.start else IO.unit
+    _                          <- HttpServer().run()
+    _                          <- finalizer
   } yield ExitCode.Success
 
 }
